@@ -15,11 +15,39 @@ const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const WindowMenu = imports.ui.windowMenu;
 
+//A bug with Dbus
+function FixBrokenDbusString(arrstr) {
+	let str = "";
+	for (let substr of arrstr) {
+		str = str + substr;
+	}
+	return str;
+}
+
+//Allow for GTK3 Deprecated calls for
+//GNOME 42 Compatibility
+
+global.__GTK_ALLOW_DEPRECATED = true;
+
 
 function log(msg) {
 	const debug = true;
 	if (debug)
 		global.log('[FILDEM_MENU] ' + msg);
+}
+
+const CircularObjectValue = () => {
+	const seen = new WeakSet();
+	return (key, value) => {
+		if (typeof value === "object" && value !== null){
+			if (seen.has(value)) {
+				return;
+			}
+
+			seen.add(value);
+		}
+		return value;
+	}
 }
 
 
@@ -204,6 +232,9 @@ var MenuButton = GObject.registerClass(
 class MenuButton extends PanelMenu.Button {
 
 	_init(label, menuBar) {
+		//This is a good starting point for initializing our
+		//new parsing method for menuBar
+		global.menuBarObjects = menuBar;
 		label = label.replace('_', '');
 		super._init(0.0, label);
 		this._label = label;
@@ -218,6 +249,11 @@ class MenuButton extends PanelMenu.Button {
 		this.box.add_child(this.labelWidget);
 		this.add_child(this.box);
 		this.connect('button-release-event', this.onButtonEvent.bind(this));
+	}
+
+	//Add individual options:
+	_addOptions() {
+		
 	}
 
 	_onStyleChanged(actor) {
@@ -290,6 +326,7 @@ const MenuBar = class MenuBar {
 		this._notifyFocusWinId = global.display.connect('notify::focus-window', this._onWindowSwitched.bind(this));
 		this._proxy.listeners['SendTopLevelMenus'].push(this._cache.withCache(this.setMenus.bind(this)));
 		this._proxy.listeners['MenuOnOff'].push(this._onMenuOnOff.bind(this));
+
 		Main.panel.reactive = true;
 		Main.panel.track_hover = true;
 
@@ -342,6 +379,7 @@ const MenuBar = class MenuBar {
 	setMenus(menus) {
 		// The expansion/shrink can be annoying, so we only do it
 		// when there’s no menus
+		log(`FILDEM: Circular menu ${JSON.stringify(menus, CircularObjectValue())}`);
 		if (menus.length === 0) {
 			this._hideMenu();
 		}
@@ -378,6 +416,7 @@ const MenuBar = class MenuBar {
 				this._appMenuButton = firstChild;
 				let label = firstChild._label;
 
+				log(`APP MENU BUTTON: ${JSON.stringify(label, CircularObjectValue())}`);
 				if (!this._showAppMenuButton) {
 					label.hide();
 				}
@@ -530,6 +569,13 @@ const ifaceXml = `
 	  <arg name="on" type="b"/>
 	</signal>
 
+	<method name="SendTopLevelOptions">
+	  <arg name="top_level_options" type="as" direction="in"/>
+	</method>
+	<signal name="SendTopLevelOptionsSignal">
+	  <arg name="top_level_options" type="as"/>
+	</signal>
+
 	<method name="SendTopLevelMenus">
 	  <arg name="top_level_menus" type="as" direction="in"/>
 	</method>
@@ -537,6 +583,12 @@ const ifaceXml = `
 	  <arg name="top_level_menus" type="as"/>
 	</signal>
 
+	<method name="RequestAction">
+	  <arg name="action" type="ab" direction="out"/>
+	</method>
+	<signal name="RequestActionSignal">
+	  <arg name="action" type="ab"/>
+	</signal>
 
 	<method name="RequestWindowActions"/>
 	<signal name="RequestWindowActionsSignal"/>
@@ -586,6 +638,8 @@ class MyProxy {
 		let id = undefined;
 		id = this._proxy.connectSignal('SendTopLevelMenus', this._onSendTopLevelMenus.bind(this));
 		this._handlerIds.push(id);
+		id = this._proxy.connectSignal('SendTopLevelOptions', this._onSendTopLevelOptions.bind(this));
+		this._handlerIds.push(id);
 		id = this._proxy.connectSignal('RequestWindowActionsSignal', this._onRequestWindowActionsSignal.bind(this));
 		this._handlerIds.push(id);
 		id = this._proxy.connectSignal('ActivateWindowActionSignal', this._onActivateWindowActionSignal.bind(this));
@@ -601,8 +655,14 @@ class MyProxy {
 	async _onSendTopLevelMenus(proxy, nameOwner, args) {
 		let topLevelMenus = args[0];
 		for (let callback of this.listeners['SendTopLevelMenus']) {
+			global.WindowMenuOptions = args[0];
 			callback(topLevelMenus);
 		}
+	}
+
+	async _onSendTopLevelOptions(proxy, nameOwner, args) {
+		let topLevelOptions = FixBrokenDbusString(args[0]);
+		log(`FILDEM: The received options were: ${JSON.stringify(topLevelOptions, CircularObjectValue())}`);
 	}
 
 	async _onRequestWindowActionsSignal(proxy, nameOwner, args) {
@@ -648,6 +708,7 @@ class Extension {
 		this._handlerIds = [];
 		this.myProxy = new MyProxy();
 		this.menubar = new MenuBar(this.myProxy, this);
+		log(`Menu bar is ${JSON.stringify(this.menubar, CircularObjectValue())}`);
 
 		this._connectSettings();
 	}
@@ -680,15 +741,14 @@ class Extension {
 
 let extension;
 
-function init(metadata) {
-}
+export default class FildemMenuExtension extends GExtension {
+	enable() {
+		let settings = new Settings(this, this.metadata['settings-schema']);
+		extension = new Extension(settings);
+	}
 
-function enable() {
-	let settings = new Settings(Me.metadata['settings-schema']);
-	extension = new Extension(settings);
-}
-
-function disable() {
-	extension.destroy();
-	extension = null;
+	disable() {
+		extension.destroy();
+		extension = null;
+	}
 }
