@@ -15,6 +15,8 @@ class PrefsWidget extends Gtk.Box {
 	_init(settings, params) {
 		super._init(params);
 
+		this.gnome_shell_verif();
+
 		this._buildable = new Gtk.Builder();
 		this._buildable.add_from_file(Me.path + '/settings.ui');
 
@@ -33,6 +35,13 @@ class PrefsWidget extends Gtk.Box {
 	show_all() {
 		if (SHELL_VERSION < '40')
 			super.show_all();
+	}
+
+	gnome_shell_verif() {
+		if (SHELL_VERSION < 42) {
+			log(`[FILDEM-HUD]: This version of fildem only works on GNOME 42 or later`);
+			quit(1);
+		}
 	}
 
 	_getWidget(name) {
