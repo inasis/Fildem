@@ -13,7 +13,7 @@ setuptools.setup(
 	description='Fildem Global Menu for Gnome Desktop',
 	long_description=long_description,
 	long_description_content_type='text/markdown',
-	url='https://github.com/gonzaarcr/Fildem',
+	url='https://github.com/inasis/Fildem',
 	packages=setuptools.find_packages(),
 	data_files=[
 		('share/applications', ['fildem-hud.desktop'])
