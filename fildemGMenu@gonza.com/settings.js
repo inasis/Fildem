@@ -26,3 +26,5 @@ class FildemGlobalMenuSettings extends Gio.Settings {
 		super._init({ settings_schema: schemaObj });
 	}
 });
+
+export {FildemGlobalMenuSettings};
