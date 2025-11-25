@@ -1,53 +1,28 @@
 'use strict';
 
-const { loadInterfaceXML } = imports.misc.fileUtils;
+// import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
-const { Clutter, Gio, GLib, GObject, Meta, St } = imports.gi;
+import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio?version=2.0';
+import GLib from 'gi://GLib?version=2.0';
+import GObject from 'gi://GObject?version=2.0';
+import Meta from 'gi://Meta';
+import St from 'gi://St?';
+import Shell from 'gi://Shell';
 
-const AppSystem  = imports.gi.Shell.AppSystem.get_default();
-const WinTracker = imports.gi.Shell.WindowTracker.get_default();
+import { Extension as GExtension } from "resource:///org/gnome/shell/extensions/extension.js";
 
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
+const WinTracker = Shell.WindowTracker.get_default();
 
-const Settings = Me.imports.settings.FildemGlobalMenuSettings;
-const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
-const WindowMenu = imports.ui.windowMenu;
-
-//A bug with Dbus
-function FixBrokenDbusString(arrstr) {
-	let str = "";
-	for (let substr of arrstr) {
-		str = str + substr;
-	}
-	return str;
-}
-
-//Allow for GTK3 Deprecated calls for
-//GNOME 42 Compatibility
-
-global.__GTK_ALLOW_DEPRECATED = true;
-
+import { FildemGlobalMenuSettings as Settings } from './settings.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as WindowMenu from 'resource:///org/gnome/shell/ui/windowMenu.js';
 
 function log(msg) {
 	const debug = true;
 	if (debug)
 		global.log('[FILDEM_MENU] ' + msg);
-}
-
-const CircularObjectValue = () => {
-	const seen = new WeakSet();
-	return (key, value) => {
-		if (typeof value === "object" && value !== null){
-			if (seen.has(value)) {
-				return;
-			}
-
-			seen.add(value);
-		}
-		return value;
-	}
 }
 
 
@@ -134,7 +109,7 @@ const WindowActions = class WindowActions {
 			if (rightMonitorIndex != -1)
 				this.actions.push('Move to Monitor Right');
 		}
-		
+
 		if (win.can_close())
 			this.actions.push('Close');
 
@@ -232,9 +207,6 @@ var MenuButton = GObject.registerClass(
 class MenuButton extends PanelMenu.Button {
 
 	_init(label, menuBar) {
-		//This is a good starting point for initializing our
-		//new parsing method for menuBar
-		global.menuBarObjects = menuBar;
 		label = label.replace('_', '');
 		super._init(0.0, label);
 		this._label = label;
@@ -249,11 +221,6 @@ class MenuButton extends PanelMenu.Button {
 		this.box.add_child(this.labelWidget);
 		this.add_child(this.box);
 		this.connect('button-release-event', this.onButtonEvent.bind(this));
-	}
-
-	//Add individual options:
-	_addOptions() {
-		
 	}
 
 	_onStyleChanged(actor) {
@@ -326,7 +293,6 @@ const MenuBar = class MenuBar {
 		this._notifyFocusWinId = global.display.connect('notify::focus-window', this._onWindowSwitched.bind(this));
 		this._proxy.listeners['SendTopLevelMenus'].push(this._cache.withCache(this.setMenus.bind(this)));
 		this._proxy.listeners['MenuOnOff'].push(this._onMenuOnOff.bind(this));
-
 		Main.panel.reactive = true;
 		Main.panel.track_hover = true;
 
@@ -379,7 +345,6 @@ const MenuBar = class MenuBar {
 	setMenus(menus) {
 		// The expansion/shrink can be annoying, so we only do it
 		// when there’s no menus
-		log(`FILDEM: Circular menu ${JSON.stringify(menus, CircularObjectValue())}`);
 		if (menus.length === 0) {
 			this._hideMenu();
 		}
@@ -416,7 +381,6 @@ const MenuBar = class MenuBar {
 				this._appMenuButton = firstChild;
 				let label = firstChild._label;
 
-				log(`APP MENU BUTTON: ${JSON.stringify(label, CircularObjectValue())}`);
 				if (!this._showAppMenuButton) {
 					label.hide();
 				}
@@ -487,7 +451,7 @@ const MenuBar = class MenuBar {
 		this._restoreLabel();
 		this._hideMenu();
 		const overview = Main.overview.visibleTarget;
-		const focusApp = WinTracker.focus_app || Main.panel.statusArea.appMenu._targetApp;
+		const focusApp = WinTracker.focus_app || Main.panel.statusArea.appMenu?._targetApp;
 		if (focusApp) {
 			let windowData = {};
 			// TODO does the window matter?
@@ -569,13 +533,6 @@ const ifaceXml = `
 	  <arg name="on" type="b"/>
 	</signal>
 
-	<method name="SendTopLevelOptions">
-	  <arg name="top_level_options" type="as" direction="in"/>
-	</method>
-	<signal name="SendTopLevelOptionsSignal">
-	  <arg name="top_level_options" type="as"/>
-	</signal>
-
 	<method name="SendTopLevelMenus">
 	  <arg name="top_level_menus" type="as" direction="in"/>
 	</method>
@@ -583,12 +540,6 @@ const ifaceXml = `
 	  <arg name="top_level_menus" type="as"/>
 	</signal>
 
-	<method name="RequestAction">
-	  <arg name="action" type="ab" direction="out"/>
-	</method>
-	<signal name="RequestActionSignal">
-	  <arg name="action" type="ab"/>
-	</signal>
 
 	<method name="RequestWindowActions"/>
 	<signal name="RequestWindowActionsSignal"/>
@@ -638,8 +589,6 @@ class MyProxy {
 		let id = undefined;
 		id = this._proxy.connectSignal('SendTopLevelMenus', this._onSendTopLevelMenus.bind(this));
 		this._handlerIds.push(id);
-		id = this._proxy.connectSignal('SendTopLevelOptions', this._onSendTopLevelOptions.bind(this));
-		this._handlerIds.push(id);
 		id = this._proxy.connectSignal('RequestWindowActionsSignal', this._onRequestWindowActionsSignal.bind(this));
 		this._handlerIds.push(id);
 		id = this._proxy.connectSignal('ActivateWindowActionSignal', this._onActivateWindowActionSignal.bind(this));
@@ -655,14 +604,8 @@ class MyProxy {
 	async _onSendTopLevelMenus(proxy, nameOwner, args) {
 		let topLevelMenus = args[0];
 		for (let callback of this.listeners['SendTopLevelMenus']) {
-			global.WindowMenuOptions = args[0];
 			callback(topLevelMenus);
 		}
-	}
-
-	async _onSendTopLevelOptions(proxy, nameOwner, args) {
-		let topLevelOptions = FixBrokenDbusString(args[0]);
-		log(`FILDEM: The received options were: ${JSON.stringify(topLevelOptions, CircularObjectValue())}`);
 	}
 
 	async _onRequestWindowActionsSignal(proxy, nameOwner, args) {
@@ -708,7 +651,6 @@ class Extension {
 		this._handlerIds = [];
 		this.myProxy = new MyProxy();
 		this.menubar = new MenuBar(this.myProxy, this);
-		log(`Menu bar is ${JSON.stringify(this.menubar, CircularObjectValue())}`);
 
 		this._connectSettings();
 	}
