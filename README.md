@@ -20,7 +20,7 @@ To install the extension, download it from the [Gnome extensions website](https:
 
 ### Ubuntu
 
-Download the .deb file from the releases section and run `sudo apt install ./fildem_*.deb`
+Download the .deb file from the releases section and run `sudo dpkg -i ./fildem_*.deb`
 
 ### Arch
 
