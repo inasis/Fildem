@@ -1,13 +1,11 @@
 'use strict';
 
-// import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
-
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio?version=2.0';
 import GLib from 'gi://GLib?version=2.0';
 import GObject from 'gi://GObject?version=2.0';
 import Meta from 'gi://Meta';
-import St from 'gi://St?';
+import St from 'gi://St';
 import Shell from 'gi://Shell';
 
 import { Extension as GExtension } from "resource:///org/gnome/shell/extensions/extension.js";
