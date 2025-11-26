@@ -2,13 +2,8 @@
   "name": "Fildem global menu",
   "description": "Global menu for Gnome",
   "settings-schema": "org.gnome.shell.extensions.fildem-global-menu",
-  "shell-version": [
-    "45",
-    "46",
-    "47",
-    "48",
-    "49"
-  ],
+  "version": "0.6.8",
+  "shell-version": ["45", "46", "47", "48", "49"],
   "url": "https://github.com/inasis/Fildem",
   "uuid": "fildemGMenu@gonza.com"
 }
